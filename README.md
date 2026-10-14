@@ -1,6 +1,16 @@
-# PrettyJSON React starter
+# PrettyJSON
 
-A small, responsive JSON formatter built with React and Vite. It can format, minify, and validate JSON, copy the result, and download it as `formatted.json`. Parsing happens in the browser; this starter does not send pasted JSON to a server.
+A responsive set of browser-based tools to format, minify, validate, and compare JSON, plus count characters. Copy or download formatted JSON. Your data is processed locally and is not sent to a server.
+
+## Screenshots
+
+| Format and validate JSON | Compare JSON |
+| --- | --- |
+| ![PrettyJSON formatting and validating JSON](docs/images/prettyjson-format.png) | ![PrettyJSON JSON comparison results](docs/images/prettyjson-compare.png) |
+
+### Count characters
+
+![PrettyJSON character counter](docs/images/prettyjson-count.png)
 
 ## What to install
 
