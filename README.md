@@ -21,11 +21,13 @@ Run `npm run build`. The website files will be generated in the `dist` folder. T
 
 ## Deploy to GitHub Pages
 
-1. Create a new GitHub repository named `prettyjson-react` (or choose another name) and push this project to its `main` branch.
+This project is published at <https://sanjaykpatel09.github.io/> from the `sanjaykpatel09.github.io` repository.
+
+1. Push this project to the `main` branch of the `sanjaykpatel09.github.io` repository.
 2. In the repository, open **Settings → Pages** and set the build and deployment source to **GitHub Actions**.
 3. Each push to `main` will build and deploy the site. The published URL will appear in the workflow run and in **Settings → Pages**.
 
-The GitHub Actions workflow automatically configures the Vite base path for the repository name.
+The GitHub Actions workflow automatically uses the root path for this `*.github.io` repository.
 
 ## Customize
 
