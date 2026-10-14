@@ -29,6 +29,10 @@ This project is published at <https://sanjaykpatel09.github.io/> from the `sanja
 
 The GitHub Actions workflow automatically uses the root path for this `*.github.io` repository.
 
+## Deploy to Netlify
+
+This project is also published at <https://prettyjson2.netlify.app/>. Netlify is connected to the same GitHub repository and automatically deploys changes pushed to `main`.
+
 ## Customize
 
 - Change the page behavior in `src/App.jsx`.
