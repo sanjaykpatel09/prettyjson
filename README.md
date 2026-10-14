@@ -43,7 +43,7 @@ The GitHub Actions workflow automatically uses the root path for this `*.github.
 
 This project is also published at <https://prettyjson2.netlify.app/>. Netlify is connected to the same GitHub repository and automatically deploys changes pushed to `main`.
 
-SEO metadata, social sharing tags, and structured data are maintained in `index.html`. The public crawl rules and sitemap are in `public/robots.txt` and `public/sitemap.xml`; update their canonical URL if the primary site address changes.
+SEO metadata, social sharing tags, structured data, and crawlable page copy are maintained in `index.html`. The public crawl rules and sitemap are in `public/robots.txt` and `public/sitemap.xml`; update their canonical URL if the primary site address changes.
 
 ## Customize
 

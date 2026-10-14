@@ -421,7 +421,7 @@ export default function App() {
           <div className="about-intro">
             <span className="about-mark">{'{}'}</span>
             <div>
-              <h1>About PrettyJSON</h1>
+              <h2>About PrettyJSON</h2>
               <p>A simple set of tools for working with JSON and text.</p>
             </div>
           </div>
