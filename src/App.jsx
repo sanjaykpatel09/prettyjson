@@ -717,6 +717,14 @@ export default function App() {
             <button className="primary-button" onClick={runCode} disabled={isRunning || !code.trim()}>
               {isRunning ? 'Running…' : '▶ Run Program'}
             </button>
+            <a
+              className="secondary-button external-runner-link"
+              href="https://www.jdoodle.com/online-java-compiler"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open JDoodle
+            </a>
             <div className={`status ${runKind}`} role="status">
               <span className="status-icon">{runKind === 'success' ? '✓' : runKind === 'error' ? '!' : 'i'}</span>
               {runMessage}
