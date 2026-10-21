@@ -1,0 +1,6 @@
+JDOODLE_CLIENT_ID=replace-with-your-jdoodle-client-id
+JDOODLE_CLIENT_SECRET=replace-with-your-jdoodle-client-secret
+JAVA_VERSION_INDEX_8=replace-with-jdoodle-version-index
+JAVA_VERSION_INDEX_11=replace-with-jdoodle-version-index
+JAVA_VERSION_INDEX_17=replace-with-jdoodle-version-index
+JAVA_VERSION_INDEX_22=replace-with-jdoodle-version-index

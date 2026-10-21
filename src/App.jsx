@@ -12,6 +12,7 @@ const codeRuntimes = {
   python: { compiler: 'cpython-3.13.8' },
   java: { compiler: 'openjdk-jdk-22+36' },
 };
+const javaRunnerUrl = import.meta.env.VITE_JAVA_RUNNER_URL;
 
 function formatRunDuration(durationMs) {
   return durationMs < 1000
@@ -92,6 +93,7 @@ export default function App() {
   const [compareMessage, setCompareMessage] = useState('Enter two JSON values and compare them.');
   const [compareKind, setCompareKind] = useState('info');
   const [codeLanguage, setCodeLanguage] = useState('java');
+  const [javaVersion, setJavaVersion] = useState(javaRunnerUrl ? '8' : '22');
   const [code, setCode] = useState(codeExamples.java);
   const [sourceFileName, setSourceFileName] = useState('Main.java');
   const [stdin, setStdin] = useState('');
@@ -270,6 +272,37 @@ export default function App() {
     const timeoutId = window.setTimeout(() => controller.abort(), 60_000);
 
     try {
+      if (codeLanguage === 'java' && javaRunnerUrl) {
+        const response = await fetch(`${javaRunnerUrl.replace(/\/+$/u, '')}/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ script: code, stdin, version: javaVersion }),
+          signal: controller.signal,
+        });
+
+        let result;
+        try {
+          result = await response.json();
+        } catch {
+          throw new Error('The Java runner returned an invalid response. Please try again.');
+        }
+
+        if (result === null || typeof result !== 'object' || Array.isArray(result)) {
+          throw new Error('The Java runner returned an invalid response. Please try again.');
+        }
+        if (!response.ok) {
+          throw new Error(typeof result.error === 'string' ? result.error : `The Java runner returned HTTP ${response.status}. Please try again.`);
+        }
+        if (typeof result.output !== 'string') {
+          throw new Error('The Java runner did not return program output. Please try again.');
+        }
+
+        setProgramOutput(result.output);
+        setRunMessage(`Java ${javaVersion} result received.`);
+        setRunKind('info');
+        return;
+      }
+
       const runtime = codeRuntimes[codeLanguage];
       const codeToRun = codeLanguage === 'java'
         ? code.replace(/^(\s*)public\s+(?=class\s+Main\b)/m, '$1')
@@ -611,9 +644,38 @@ export default function App() {
                 </div>
                 <label className="language-select-label" htmlFor="code-language">Language</label>
                 <select id="code-language" className="language-select" value={codeLanguage} onChange={changeCodeLanguage}>
-                  <option value="java">Java 22</option>
+                  <option value="java">Java</option>
                   <option value="python">Python 3.13</option>
                 </select>
+                {codeLanguage === 'java' && (
+                  <>
+                    <label className="language-select-label" htmlFor="java-version">Java Version</label>
+                    <select
+                      id="java-version"
+                      className="language-select"
+                      value={javaVersion}
+                      onChange={(event) => {
+                        setJavaVersion(event.target.value);
+                        setProgramOutput('');
+                        setRunDurationMs(null);
+                        setComplexityEstimate(null);
+                        setRunMessage('Ready to run your program.');
+                        setRunKind('info');
+                      }}
+                    >
+                      {javaRunnerUrl ? (
+                        <>
+                          <option value="8">Java 8</option>
+                          <option value="11">Java 11</option>
+                          <option value="17">Java 17</option>
+                          <option value="22">Java 22</option>
+                        </>
+                      ) : (
+                        <option value="22">Java 22 (Wandbox)</option>
+                      )}
+                    </select>
+                  </>
+                )}
               </div>
               <Suspense fallback={<div className="editor-loading">Loading code editor…</div>}>
                 <CodeEditor
@@ -678,7 +740,7 @@ export default function App() {
             </div>
           </div>
           <p className="runner-disclosure">
-            Big-O values are rough local estimates based on loop nesting and common collection allocations; recursion and complex control flow may not be detected. Elapsed time includes network and runner startup. Code and stdin are sent to Wandbox for execution; do not submit passwords, API keys, or other sensitive information.
+            Big-O values are rough local estimates based on loop nesting and common collection allocations; recursion and complex control flow may not be detected. Elapsed time includes network and runner startup. {javaRunnerUrl ? 'Java code and stdin are sent through your configured JDoodle runner; ' : 'Java 22 and Python code and stdin are sent to Wandbox; '}do not submit passwords, API keys, or other sensitive information.
           </p>
         </section>
       ) : (
@@ -709,10 +771,10 @@ export default function App() {
             <article className="about-card">
               <span className="about-card-icon">&gt;_</span>
               <h2>Run Java &amp; Python</h2>
-              <p>Write a program, provide optional standard input, and run it online with Java 22 or Python 3.13.</p>
+              <p>{javaRunnerUrl ? 'Write a program, provide optional standard input, and run it online with Java 8, 11, 17, or 22, or Python 3.13.' : 'Write a program, provide optional standard input, and run it online with Java 22 or Python 3.13.'}</p>
             </article>
           </div>
-          <p className="about-note">JSON and text tools run in your browser. Code and program input are sent to Wandbox for execution; do not submit secrets.</p>
+          <p className="about-note">JSON and text tools run in your browser. {javaRunnerUrl ? 'Java code is sent through your configured JDoodle runner and Python code to Wandbox' : 'Code and program input are sent to Wandbox'}; do not submit secrets.</p>
         </section>
       )}
 
