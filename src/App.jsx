@@ -10,7 +10,7 @@ const codeExamples = {
 
 const codeRuntimes = {
   python: { compiler: 'cpython-3.13.8' },
-  java: { compiler: 'openjdk-jdk-21+35' },
+  java: { compiler: 'openjdk-jdk-22+36' },
 };
 
 function formatRunDuration(durationMs) {
@@ -611,7 +611,7 @@ export default function App() {
                 </div>
                 <label className="language-select-label" htmlFor="code-language">Language</label>
                 <select id="code-language" className="language-select" value={codeLanguage} onChange={changeCodeLanguage}>
-                  <option value="java">Java 21</option>
+                  <option value="java">Java 22</option>
                   <option value="python">Python 3.13</option>
                 </select>
               </div>
@@ -678,7 +678,7 @@ export default function App() {
             </div>
           </div>
           <p className="runner-disclosure">
-            Big-O values are rough local estimates based on loop nesting and common collection allocations; recursion and complex control flow may not be detected. Elapsed time includes network and runner startup. Code and stdin are sent to Wandbox; do not submit passwords, API keys, or other sensitive information.
+            Big-O values are rough local estimates based on loop nesting and common collection allocations; recursion and complex control flow may not be detected. Elapsed time includes network and runner startup. Code and stdin are sent to Wandbox for execution; do not submit passwords, API keys, or other sensitive information.
           </p>
         </section>
       ) : (
@@ -709,7 +709,7 @@ export default function App() {
             <article className="about-card">
               <span className="about-card-icon">&gt;_</span>
               <h2>Run Java &amp; Python</h2>
-              <p>Write a program, provide optional standard input, and run it online with Java 21 or Python 3.13.</p>
+              <p>Write a program, provide optional standard input, and run it online with Java 22 or Python 3.13.</p>
             </article>
           </div>
           <p className="about-note">JSON and text tools run in your browser. Code and program input are sent to Wandbox for execution; do not submit secrets.</p>
