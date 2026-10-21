@@ -1,4 +1,23 @@
-import React, { useMemo, useState } from 'react';
+import React, { lazy, Suspense, useMemo, useState } from 'react';
+import { estimateComplexity } from './complexity.js';
+
+const CodeEditor = lazy(() => import('./CodeEditor.jsx'));
+
+const codeExamples = {
+  python: 'print("Hello, world!")\n',
+  java: 'class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, world!");\n    }\n}\n',
+};
+
+const codeRuntimes = {
+  python: { compiler: 'cpython-3.13.8' },
+  java: { compiler: 'openjdk-jdk-21+35' },
+};
+
+function formatRunDuration(durationMs) {
+  return durationMs < 1000
+    ? `${Math.round(durationMs)} ms`
+    : `${(durationMs / 1000).toFixed(2)} s`;
+}
 
 const example = JSON.stringify({
   userId: 1,
@@ -72,6 +91,16 @@ export default function App() {
   const [comparison, setComparison] = useState(null);
   const [compareMessage, setCompareMessage] = useState('Enter two JSON values and compare them.');
   const [compareKind, setCompareKind] = useState('info');
+  const [codeLanguage, setCodeLanguage] = useState('java');
+  const [code, setCode] = useState(codeExamples.java);
+  const [sourceFileName, setSourceFileName] = useState('Main.java');
+  const [stdin, setStdin] = useState('');
+  const [programOutput, setProgramOutput] = useState('');
+  const [runMessage, setRunMessage] = useState('Ready to run your program.');
+  const [runKind, setRunKind] = useState('info');
+  const [isRunning, setIsRunning] = useState(false);
+  const [runDurationMs, setRunDurationMs] = useState(null);
+  const [complexityEstimate, setComplexityEstimate] = useState(null);
 
   const stats = useMemo(() => ({
     chars: output.length,
@@ -161,6 +190,29 @@ export default function App() {
     setKind('success');
   }
 
+  function downloadSourceCode() {
+    const sanitizedName = sourceFileName.trim().replace(/[<>:"/\\|?*\u0000-\u001F]/gu, '_');
+    if (!sanitizedName) {
+      setRunMessage('Enter a file name before downloading.');
+      setRunKind('error');
+      return;
+    }
+
+    const extension = codeLanguage === 'python' ? '.py' : '.java';
+    const downloadName = /\.(?:py|java)$/iu.test(sanitizedName)
+      ? sanitizedName.replace(/\.(?:py|java)$/iu, extension)
+      : `${sanitizedName}${extension}`;
+    const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = downloadName;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setRunMessage(`Downloaded ${downloadName}.`);
+    setRunKind('success');
+  }
+
   function loadExample() {
     setInput(example);
     setOutput('');
@@ -205,11 +257,122 @@ export default function App() {
     setCompareKind('info');
   }
 
+  async function runCode() {
+    const runStartedAt = performance.now();
+    setComplexityEstimate(estimateComplexity(codeLanguage, code));
+    setIsRunning(true);
+    setProgramOutput('');
+    setRunDurationMs(null);
+    setRunMessage('Connecting to the online runner…');
+    setRunKind('info');
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 60_000);
+
+    try {
+      const runtime = codeRuntimes[codeLanguage];
+      const codeToRun = codeLanguage === 'java'
+        ? code.replace(/^(\s*)public\s+(?=class\s+Main\b)/m, '$1')
+        : code;
+      const response = await fetch('https://wandbox.org/api/compile.ndjson', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          compiler: runtime.compiler,
+          code: codeToRun,
+          stdin,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`The code runner returned HTTP ${response.status}. Please try again.`);
+      }
+      if (!response.body) {
+        throw new Error('The online runner did not provide a readable response. Please try again.');
+      }
+
+      setRunMessage('Compiling and running…');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let pending = '';
+      let output = '';
+      let compilerError = '';
+      let exitCode;
+      let isFinished = false;
+
+      function processEvent(line) {
+        if (!line.trim()) return;
+
+        const event = JSON.parse(line);
+        if (event.type === 'StdOut' || event.type === 'StdErr' || event.type === 'CompilerMessage' || event.type === 'CompilerMessageE') {
+          output += event.data;
+          if (event.type === 'CompilerMessageE') compilerError += event.data;
+          setProgramOutput(output.trimEnd());
+        } else if (event.type === 'ExitCode') {
+          exitCode = event.data;
+          if (exitCode !== '0') {
+            setRunMessage(compilerError ? 'Compilation failed.' : 'Program finished with an error.');
+            setRunKind('error');
+          } else {
+            setRunMessage('Program is finishing…');
+          }
+        } else if (event.type === 'Control' && event.data === 'Finish') {
+          isFinished = true;
+        }
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        pending += decoder.decode(value, { stream: !done });
+
+        const lines = pending.split('\n');
+        pending = lines.pop() ?? '';
+        for (const line of lines) processEvent(line);
+
+        if (done) break;
+      }
+      processEvent(pending);
+
+      if (exitCode === undefined || !isFinished) {
+        throw new Error('The online runner ended before returning a complete result. Please try again.');
+      }
+
+      if (exitCode === '0') {
+        setRunMessage('Program finished successfully.');
+        setRunKind('success');
+      }
+    } catch (error) {
+      setRunMessage(error instanceof Error && error.name === 'AbortError'
+        ? 'The runner took longer than 60 seconds and was stopped. Please try again.'
+        : error instanceof TypeError
+          ? 'Could not reach the online runner. Check your connection and try again.'
+          : error instanceof Error ? error.message : 'An unexpected error occurred while running your program.');
+      setRunKind('error');
+    } finally {
+      window.clearTimeout(timeoutId);
+      setRunDurationMs(performance.now() - runStartedAt);
+      setIsRunning(false);
+    }
+  }
+
+  function changeCodeLanguage(event) {
+    const language = event.target.value;
+    setCodeLanguage(language);
+    setCode(codeExamples[language]);
+    setSourceFileName(language === 'python' ? 'main.py' : 'Main.java');
+    setProgramOutput('');
+    setRunDurationMs(null);
+    setComplexityEstimate(null);
+    setRunMessage('Ready to run your program.');
+    setRunKind('info');
+  }
+
   return (
     <main className="page">
       <header className="topbar">
         <a className="brand" href="#top" aria-label="PrettyJSON home"><span className="brand-mark">{'{}'}</span> PrettyJSON</a>
-        <nav className="tabs" role="tablist" aria-label="JSON tools">
+        <nav className="tabs" role="tablist" aria-label="Developer tools">
           <button
             className={`tab ${activeTab === 'format' ? 'active' : ''}`}
             id="format-tab"
@@ -243,6 +406,18 @@ export default function App() {
           >
             <span className="tab-label-wide">Count Characters</span>
             <span className="tab-label-compact">Count</span>
+          </button>
+          <button
+            className={`tab ${activeTab === 'code' ? 'active' : ''}`}
+            id="code-tab"
+            role="tab"
+            aria-label="Code"
+            aria-selected={activeTab === 'code'}
+            aria-controls="code-panel"
+            onClick={() => setActiveTab('code')}
+          >
+            <span className="tab-label-wide">Code</span>
+            <span className="tab-label-compact">Code</span>
           </button>
           <button
             className={`tab ${activeTab === 'about' ? 'active' : ''}`}
@@ -416,6 +591,96 @@ export default function App() {
             <div className="count-card"><span>Lines</span><strong>{textStats.lines.toLocaleString()}</strong></div>
           </div>
         </section>
+      ) : activeTab === 'code' ? (
+        <section className="code-workspace" id="code-panel" role="tabpanel" aria-labelledby="code-tab" aria-label="Online code runner">
+          <div className="code-editors">
+            <div className="panel code-editor">
+              <div className="panel-heading">
+                <div><span className="step">01</span><h2>Program</h2></div>
+                <div className="code-file-controls">
+                  <label className="visually-hidden" htmlFor="source-filename">Source file name</label>
+                  <input
+                    className="source-filename-input"
+                    id="source-filename"
+                    type="text"
+                    value={sourceFileName}
+                    onChange={(event) => setSourceFileName(event.target.value)}
+                    aria-label="Source file name"
+                  />
+                  <button className="text-button" onClick={downloadSourceCode} disabled={!code.trim()}>Download</button>
+                </div>
+                <label className="language-select-label" htmlFor="code-language">Language</label>
+                <select id="code-language" className="language-select" value={codeLanguage} onChange={changeCodeLanguage}>
+                  <option value="java">Java 21</option>
+                  <option value="python">Python 3.13</option>
+                </select>
+              </div>
+              <Suspense fallback={<div className="editor-loading">Loading code editor…</div>}>
+                <CodeEditor
+                  language={codeLanguage}
+                  code={code}
+                  onChange={(value) => {
+                    setCode(value);
+                    setRunDurationMs(null);
+                    setComplexityEstimate(null);
+                  }}
+                />
+              </Suspense>
+            </div>
+            <div className="code-side">
+              <div className="panel stdin-panel">
+                <div className="panel-heading">
+                  <div><span className="step">02</span><h2>Input (stdin)</h2></div>
+                </div>
+                <textarea
+                  aria-label="Program input"
+                  spellCheck="false"
+                  value={stdin}
+                  onChange={(event) => {
+                    setStdin(event.target.value);
+                    setRunDurationMs(null);
+                  }}
+                  placeholder="Optional input passed to your program…"
+                />
+              </div>
+              <div className="panel program-output-panel">
+                <div className="panel-heading">
+                  <div><span className="step">03</span><h2>Output</h2></div>
+                </div>
+                <pre className="program-output" aria-live="polite">{programOutput || 'Your program output will appear here…'}</pre>
+              </div>
+            </div>
+          </div>
+          <div className="run-controls">
+            <button className="primary-button" onClick={runCode} disabled={isRunning || !code.trim()}>
+              {isRunning ? 'Running…' : '▶ Run Program'}
+            </button>
+            <div className={`status ${runKind}`} role="status">
+              <span className="status-icon">{runKind === 'success' ? '✓' : runKind === 'error' ? '!' : 'i'}</span>
+              {runMessage}
+            </div>
+          </div>
+          <div className="run-metrics" aria-label="Run metrics and complexity">
+            <div className="run-metric">
+              <span>Compile + execution</span>
+              <strong>{runDurationMs === null ? (isRunning ? 'Running…' : '—') : formatRunDuration(runDurationMs)}</strong>
+              <small>Browser-measured total time</small>
+            </div>
+            <div className="run-metric">
+              <span>Time complexity</span>
+              <strong>{complexityEstimate?.time ?? (isRunning ? 'Analyzing…' : 'Run to analyze')}</strong>
+              <small>Static heuristic estimate</small>
+            </div>
+            <div className="run-metric">
+              <span>Space complexity</span>
+              <strong>{complexityEstimate?.space ?? (isRunning ? 'Analyzing…' : 'Run to analyze')}</strong>
+              <small>Static heuristic estimate</small>
+            </div>
+          </div>
+          <p className="runner-disclosure">
+            Big-O values are rough local estimates based on loop nesting and common collection allocations; recursion and complex control flow may not be detected. Elapsed time includes network and runner startup. Code and stdin are sent to Wandbox; do not submit passwords, API keys, or other sensitive information.
+          </p>
+        </section>
       ) : (
         <section className="about-workspace" id="about-panel" role="tabpanel" aria-labelledby="about-tab">
           <div className="about-intro">
@@ -441,8 +706,13 @@ export default function App() {
               <h2>Count characters</h2>
               <p>Count characters, characters without whitespace, words, and lines as you type or paste text.</p>
             </article>
+            <article className="about-card">
+              <span className="about-card-icon">&gt;_</span>
+              <h2>Run Java &amp; Python</h2>
+              <p>Write a program, provide optional standard input, and run it online with Java 21 or Python 3.13.</p>
+            </article>
           </div>
-          <p className="about-note">Your text is processed locally in your browser; PrettyJSON does not send it to a server.</p>
+          <p className="about-note">JSON and text tools run in your browser. Code and program input are sent to Wandbox for execution; do not submit secrets.</p>
         </section>
       )}
 
