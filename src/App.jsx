@@ -369,9 +369,9 @@ export default function App() {
   }
 
   return (
-    <main className="page">
+    <main className="page" id="top">
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="PrettyJSON home"><span className="brand-mark">{'{}'}</span> PrettyJSON</a>
+        <a className="brand" href="#top" aria-label="PrettyJSON home" onClick={() => setActiveTab('format')}><span className="brand-mark">{'{}'}</span> PrettyJSON</a>
         <nav className="tabs" role="tablist" aria-label="Developer tools">
           <button
             className={`tab ${activeTab === 'format' ? 'active' : ''}`}
