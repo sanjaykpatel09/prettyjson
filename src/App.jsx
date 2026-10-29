@@ -641,6 +641,9 @@ export default function App() {
                     aria-label="Source file name"
                   />
                   <button className="text-button" onClick={downloadSourceCode} disabled={!code.trim()}>Download</button>
+                  <button className="primary-button compact-button" onClick={runCode} disabled={isRunning || !code.trim()}>
+                    {isRunning ? 'Running…' : '▶ Run Program'}
+                  </button>
                 </div>
                 <label className="language-select-label" htmlFor="code-language">Language</label>
                 <select id="code-language" className="language-select" value={codeLanguage} onChange={changeCodeLanguage}>
@@ -714,9 +717,6 @@ export default function App() {
             </div>
           </div>
           <div className="run-controls">
-            <button className="primary-button" onClick={runCode} disabled={isRunning || !code.trim()}>
-              {isRunning ? 'Running…' : '▶ Run Program'}
-            </button>
             <a
               className="secondary-button external-runner-link"
               href="https://www.jdoodle.com/online-java-compiler"
